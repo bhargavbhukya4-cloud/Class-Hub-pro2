@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CLASS HUB setup check</title>
+<style>body{font-family:system-ui,sans-serif;background:#eef6fd;color:#0f2740;margin:0;padding:24px}main{max-width:520px;margin:auto;background:#fff;border-radius:22px;padding:22px;box-shadow:0 10px 30px rgba(30,100,170,.15)}h1{margin:0 0 6px;font-size:22px}ul{padding:0}li{margin:14px 0;list-style:none}small{display:block;color:#5d7a96;margin-top:3px;word-break:break-word}</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script></head>
+<body><main><h1>CLASS HUB setup check</h1><p>Every line should show a green tick. The first red cross is what to fix.</p><ul id="o"></ul><p><a href="index.html">Open CLASS HUB</a></p></main>
+<script>
+const o = document.getElementById('o');
+const add = t => { const li = document.createElement('li'); li.textContent = '\u23f3 ' + t; o.appendChild(li); return (ok, msg) => { li.textContent = (ok ? '\u2705 ' : '\u274c ') + t; if (msg) { const s = document.createElement('small'); s.textContent = msg; li.appendChild(s); } return ok; }; };
+(async () => {
+  let sb, uid, r;
+  const u = window.SUPABASE_URL || '', k = window.SUPABASE_ANON_KEY || '';
+  r = add('Keys in config.js');
+  if (!r(/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(u) && k.length > 40, 'The URL must look like https://abcd1234.supabase.co with no slash at the end, and the anon key must be pasted. Found: ' + u.slice(0, 45))) return;
+  r = add('Connect to Supabase');
+  try { sb = supabase.createClient(u, k); r(true); } catch (e) { r(false, e.message); return; }
+  r = add('Anonymous sign-in (turn it ON in Authentication > Sign In / Providers)');
+  try { let { data: { session } } = await sb.auth.getSession(); if (!session) { const x = await sb.auth.signInAnonymously(); if (x.error) throw x.error; session = x.data.session; } uid = session.user.id; r(true); } catch (e) { r(false, e.message); return; }
+  r = add('Database table "docs" (run schema.sql)');
+  { const x = await sb.from('docs').select('path').limit(1); if (!r(!x.error, x.error && x.error.message)) return; }
+  r = add('Database rules (write test)');
+  { const p = 'data/users/' + uid + '/ping', a = await sb.from('docs').insert({ path: p, parent: 'data/users/' + uid, data: { t: 1 } }); if (!r(!a.error, a.error && a.error.message)) return; await sb.from('docs').delete().eq('path', p); }
+  r = add('File storage bucket "class-files" (run schema.sql)');
+  { const x = await sb.storage.from('class-files').list('x'); r(!x.error, x.error && x.error.message); }
+  add('All good. Open CLASS HUB.')(true);
+})();
+</script></body></html>
